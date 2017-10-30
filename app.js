@@ -3,10 +3,7 @@ const TOP_LEVEL_COMPONENTS = [
   'js-outro', 'js-quiz-status',
 ];
 
-// Create an Api class and immediately instantiate it into a global `api` variable
-// We don't need the class exposed as we are not instantiating more than one Api
-// but we're using a closure to keep some data private.
-const api = function(){
+const Api = function(){
   const BASE_API_URL = 'https://opentdb.com';
   let sessionToken;
 
@@ -48,12 +45,9 @@ const api = function(){
     
   }
 
-  return new Api();
+  return Api;
 }();
 
-// Create a Store class and immediately instantiate it into a global `store` variable
-// We don't need the class exposed as we are not instantiating more than one Store
-// but we're using a closure to keep some data private.
 const Store = function(){
 
   // Private variables
@@ -118,47 +112,7 @@ const Store = function(){
   return Store;
 }();
 
-// Plain old object for grouping Template functions. The methods don't depending on 
-// their own context objects and are only passed data for rendering HTML.
-const Templates = {
-  generateAnswerItemHtml(answer) {
-    return `
-      <li class="answer-item">
-        <input type="radio" name="answers" value="${answer}" />
-        <span class="answer-text">${answer}</span>
-      </li>
-    `;
-  },
-  
-  generateQuestionHtml(question) {
-    return `
-      <form>
-        <div class="question-text">
-          ${question.text}      
-        </div>
-        <ul class="question-answers-list">
-          ${question.answers.map((answer, index) => this.generateAnswerItemHtml(answer, index)).join('')}
-        </ul>
-        <div>
-          <input type="submit" />
-        </div>
-      </form>
-    `;
-  },
-
-  generateFeedbackHtml(feedback) {
-    return `
-      <p>
-        ${feedback}
-      </p>
-      <button class="continue js-continue">Continue</button>
-    `;
-  }
-};
-
-// Plain old object for grouping Event Handler functions. Each method is using the
-// global api and/or store instances and isn't depending on its own context object.
-const Handler = function(store, renderer){
+const Handler = function(store, renderer, api){
   this.startQuiz = function() {
     store.setInitialStore();
     const quantity = parseInt($('#js-question-quantity').find(':selected').val(), 10);
@@ -208,6 +162,42 @@ const Renderer = function(store){
   const hideAll = function() {
     TOP_LEVEL_COMPONENTS.forEach(component => $(`.${component}`).hide());
   };
+
+  const templates = {
+    generateAnswerItemHtml(answer) {
+      return `
+        <li class="answer-item">
+          <input type="radio" name="answers" value="${answer}" />
+          <span class="answer-text">${answer}</span>
+        </li>
+      `;
+    },
+    
+    generateQuestionHtml(question) {
+      return `
+        <form>
+          <div class="question-text">
+            ${question.text}      
+          </div>
+          <ul class="question-answers-list">
+            ${question.answers.map((answer, index) => this.generateAnswerItemHtml(answer, index)).join('')}
+          </ul>
+          <div>
+            <input type="submit" />
+          </div>
+        </form>
+      `;
+    },
+  
+    generateFeedbackHtml(feedback) {
+      return `
+        <p>
+          ${feedback}
+        </p>
+        <button class="continue js-continue">Continue</button>
+      `;
+    }
+  };
   
   this.render = function() {
     let html;
@@ -227,14 +217,14 @@ const Renderer = function(store){
         break;
       
       case 'question':
-        html = Templates.generateQuestionHtml(question);
+        html = templates.generateQuestionHtml(question);
         $('.js-question').html(html);
         $('.js-question').show();
         $('.quiz-status').show();
         break;
   
       case 'answer':
-        html = Templates.generateFeedbackHtml(feedback);
+        html = templates.generateFeedbackHtml(feedback);
         $('.js-question-feedback').html(html);
         $('.js-question-feedback').show();
         $('.quiz-status').show();
@@ -251,13 +241,15 @@ const Renderer = function(store){
   };
 };
 
-// Initialize store outside DOM-ready function so it's available globally for debugging.
-const store = new Store();
+// Put `store` in global scope for debugging.
+let store;
 
 // On DOM Ready, run render() and add event listeners
 $(() => {
+  const api = new Api();
+  store = new Store();
   const renderer = new Renderer(store);
-  const handler = new Handler(store, renderer);
+  const handler = new Handler(store, renderer, api);
 
   // Setup initial store and run first render
   store.setInitialStore();
