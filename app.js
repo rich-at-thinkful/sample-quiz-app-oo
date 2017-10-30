@@ -54,7 +54,7 @@ const api = function(){
 // Create a Store class and immediately instantiate it into a global `store` variable
 // We don't need the class exposed as we are not instantiating more than one Store
 // but we're using a closure to keep some data private.
-const store = function(){
+const Store = function(){
 
   // Private variables
   const QUESTIONS = [];
@@ -66,20 +66,12 @@ const store = function(){
     };
   };
 
-  const hideAll = function() {
-    TOP_LEVEL_COMPONENTS.forEach(component => $(`.${component}`).hide());
-  };
-
   const getQuestion = function(index) {
     return QUESTIONS[index];
   };
 
   class Store {
-    // Quasi-private methods - we prefix with underscore to indicate they are only intended for
-    // use from within other store methods. They ARE visible on the `store` instance, though.
-    // These method types are useful when you need access to other props on the store from
-    // within the method.
-    _getScore() {
+    getScore() {
       return this.userAnswers.reduce((accumulator, userAnswer, index) => {
         const question = getQuestion(index);
     
@@ -91,7 +83,7 @@ const store = function(){
       }, 0);
     }
 
-    _getProgress() {
+    getProgress() {
       return {
         current: this.currentQuestionIndex + 1,
         total: QUESTIONS.length
@@ -121,46 +113,9 @@ const store = function(){
     getCurrentQuestion() {
       return QUESTIONS[this.currentQuestionIndex];
     }
-
-    render() {
-      let html;
-      hideAll();
-    
-      const { feedback, page } = this; 
-      const question = this.getCurrentQuestion();
-      const { current, total } = this._getProgress();
-      const score = this._getScore();
-    
-      $('.js-score').html(`<span>Score: ${score}</span>`);
-      $('.js-progress').html(`<span>Question ${current} of ${total}`);
-    
-      switch (page) {
-        case 'intro':
-          $('.js-intro').show();
-          break;
-        
-        case 'question':
-          html = Templates.generateQuestionHtml(question);
-          $('.js-question').html(html);
-          $('.js-question').show();
-          $('.quiz-status').show();
-          break;
-    
-        case 'answer':
-          html = Templates.generateFeedbackHtml(feedback);
-          $('.js-question-feedback').html(html);
-          $('.js-question-feedback').show();
-          $('.quiz-status').show();
-          break;
-    
-        case 'outro':
-          $('.js-outro').show();
-          $('.quiz-status').show();
-          break;
-      }
-    }
   }
-  return new Store();
+
+  return Store;
 }();
 
 // Plain old object for grouping Template functions. The methods don't depending on 
@@ -203,8 +158,8 @@ const Templates = {
 
 // Plain old object for grouping Event Handler functions. Each method is using the
 // global api and/or store instances and isn't depending on its own context object.
-const Handlers = {
-  startQuiz() {
+const Handler = function(store, renderer){
+  this.startQuiz = function() {
     store.setInitialStore();
     const quantity = parseInt($('#js-question-quantity').find(':selected').val(), 10);
 
@@ -216,11 +171,11 @@ const Handlers = {
       store.page = 'question';
       store.currentQuestionIndex = 0;
       store.seedQuestions(res.results);
-      store.render();
+      renderer.render();
     });
-  },
+  };
 
-  submitAnswer(e) {
+  this.submitAnswer = function(e) {
     e.preventDefault();
     const question = store.getCurrentQuestion();
     const selected = $('input:checked').val();
@@ -233,33 +188,86 @@ const Handlers = {
     }
   
     store.page = 'answer';
-    store.render();
-  },
+    renderer.render();
+  };
 
-  nextQuestion() {
+  this.nextQuestion = function() {
     if (store.isLastQuestion()) {
       store.page = 'outro';
-      store.render();
+      renderer.render();
       return;
     }
   
     store.currentQuestionIndex++;
     store.page = 'question';
-    store.render();
-  }
+    renderer.render();
+  };
 };
+
+const Renderer = function(store){
+  const hideAll = function() {
+    TOP_LEVEL_COMPONENTS.forEach(component => $(`.${component}`).hide());
+  };
+  
+  this.render = function() {
+    let html;
+    hideAll();
+  
+    const { feedback, page } = store; 
+    const question = store.getCurrentQuestion();
+    const { current, total } = store.getProgress();
+    const score = store.getScore();
+  
+    $('.js-score').html(`<span>Score: ${score}</span>`);
+    $('.js-progress').html(`<span>Question ${current} of ${total}`);
+  
+    switch (page) {
+      case 'intro':
+        $('.js-intro').show();
+        break;
+      
+      case 'question':
+        html = Templates.generateQuestionHtml(question);
+        $('.js-question').html(html);
+        $('.js-question').show();
+        $('.quiz-status').show();
+        break;
+  
+      case 'answer':
+        html = Templates.generateFeedbackHtml(feedback);
+        $('.js-question-feedback').html(html);
+        $('.js-question-feedback').show();
+        $('.quiz-status').show();
+        break;
+  
+      case 'outro':
+        $('.js-outro').show();
+        $('.quiz-status').show();
+        break;
+
+      default:
+        return;
+    } 
+  };
+};
+
+// Initialize store outside DOM-ready function so it's available globally for debugging.
+const store = new Store();
 
 // On DOM Ready, run render() and add event listeners
 $(() => {
-  // Run first render
+  const renderer = new Renderer(store);
+  const handler = new Handler(store, renderer);
+
+  // Setup initial store and run first render
   store.setInitialStore();
-  store.render();
+  renderer.render();
 
   api.fetchToken(() => {
     $('.js-start').attr('disabled', false);
   });
 
-  $('.js-intro, .js-outro').on('click', '.js-start', Handlers.startQuiz);
-  $('.js-question').on('submit', Handlers.submitAnswer);
-  $('.js-question-feedback').on('click', '.js-continue', Handlers.nextQuestion);
+  $('.js-intro, .js-outro').on('click', '.js-start', handler.startQuiz);
+  $('.js-question').on('submit', handler.submitAnswer);
+  $('.js-question-feedback').on('click', '.js-continue', handler.nextQuestion);
 });
