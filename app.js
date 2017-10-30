@@ -244,7 +244,7 @@ const Renderer = function(store){
 // Put `store` in global scope for debugging.
 let store;
 
-// On DOM Ready, run render() and add event listeners
+// On DOM Ready, instantiate all services and run startup methods
 $(() => {
   const api = new Api();
   store = new Store();
