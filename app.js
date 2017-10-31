@@ -45,70 +45,71 @@ class Api {
   }
 }
 
-const Store = function(){
+class Store {
+  constructor() {
+    this.setOrResetInitialStore();
+  }
 
-  // Private variables
-  const QUESTIONS = [];
-  const createQuestion = function(question) {
+  _createQuestion(question) {
     return {
       text: question.question,
       answers: [ ...question.incorrect_answers, question.correct_answer ],
       correctAnswer: question.correct_answer
     };
-  };
-
-  const getQuestion = function(index) {
-    return QUESTIONS[index];
-  };
-
-  class Store {
-    getScore() {
-      return this.userAnswers.reduce((accumulator, userAnswer, index) => {
-        const question = getQuestion(index);
-    
-        if (question.correctAnswer === userAnswer) {
-          return accumulator + 1;
-        } else {
-          return accumulator;
-        }
-      }, 0);
-    }
-
-    getProgress() {
-      return {
-        current: this.currentQuestionIndex + 1,
-        total: QUESTIONS.length
-      };
-    }
-
-    // Public methods, all available on store object, called from event handlers, etc.
-    setInitialStore() {
-      for (const prop of Object.getOwnPropertyNames(this)) {
-        delete this[prop];
-      }
-      this.page = 'intro';
-      this.apiReady = false;
-      this.currentQuestionIndex = null;
-      this.userAnswers = [];
-      this.feedback = null;
-    }
-
-    isLastQuestion(){
-      return this.currentQuestionIndex === QUESTIONS.length - 1;
-    }
-  
-    seedQuestions(questions) {
-      QUESTIONS.length = 0;
-      questions.forEach(q => QUESTIONS.push(createQuestion(q)));
-    }
-
-    getCurrentQuestion() {
-      return QUESTIONS[this.currentQuestionIndex];
-    }
   }
 
-  return Store;
-}();
+  _getQuestion(index) {
+    return this._QUESTIONS[index];
+  }
+
+  // Public methods
+  setOrResetInitialStore() {
+    for (const prop of Object.getOwnPropertyNames(this)) {
+      delete this[prop];
+    }
+    this._QUESTIONS = [];
+    this.page = 'intro';
+    this.apiReady = false;
+    this.currentQuestionIndex = null;
+    this.userAnswers = [];
+    this.feedback = null;
+  }
+
+  getScore() {
+    return this.userAnswers.reduce((accumulator, userAnswer, index) => {
+      const question = this._getQuestion(index);
+  
+      if (question.correctAnswer === userAnswer) {
+        return accumulator + 1;
+      } else {
+        return accumulator;
+      }
+    }, 0);
+  }
+
+  getProgress() {
+    return {
+      current: this.currentQuestionIndex + 1,
+      total: this._QUESTIONS.length
+    };
+  }
+
+  isLastQuestion(){
+    return this.currentQuestionIndex ===this._QUESTIONS.length - 1;
+  }
+
+  seedQuestions(questions) {
+    console.log('seeding');
+    this._QUESTIONS.length = 0;
+    questions.forEach(q => this._QUESTIONS.push(this._createQuestion(q)));
+    console.log(this);
+  }
+
+  getCurrentQuestion() {
+    console.log('getting...', this);
+    return this._QUESTIONS[this.currentQuestionIndex];
+  }
+}
 
 class Renderer {
   constructor(store, api) {
@@ -210,7 +211,7 @@ class Renderer {
   }
 
   handleStartQuiz() {
-    this.store.setInitialStore();
+    this.store.setOrResetInitialStore();
     const quantity = parseInt($('#js-question-quantity').find(':selected').val(), 10);
 
     this.api.fetchQuestions(quantity, { type: 'multiple' }, res => {
@@ -266,8 +267,7 @@ const renderer = new Renderer(store, api);
 
 // On DOM Ready, instantiate all services and run startup methods
 $(() => {
-  // Setup initial store and run first render
-  store.setInitialStore();
+  // Run first render and add listeners
   renderer.render();
   renderer.applyEventListeners();
   
