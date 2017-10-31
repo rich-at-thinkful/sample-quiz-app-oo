@@ -99,14 +99,11 @@ class Store {
   }
 
   seedQuestions(questions) {
-    console.log('seeding');
     this._QUESTIONS.length = 0;
     questions.forEach(q => this._QUESTIONS.push(this._createQuestion(q)));
-    console.log(this);
   }
 
   getCurrentQuestion() {
-    console.log('getting...', this);
     return this._QUESTIONS[this.currentQuestionIndex];
   }
 }
