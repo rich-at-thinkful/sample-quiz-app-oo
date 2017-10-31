@@ -3,50 +3,47 @@ const TOP_LEVEL_COMPONENTS = [
   'js-outro', 'js-quiz-status',
 ];
 
-const Api = function(){
-  const BASE_API_URL = 'https://opentdb.com';
-  let sessionToken;
+class Api {
+  constructor(){
+    this.BASE_API_URL = 'https://opentdb.com'; 
+    this.sessionToken = null;
+  }
 
-  const buildBaseUrl = function(amt = 10, query = {}) {
-    const url = new URL(BASE_API_URL + '/api.php');
+  _buildBaseUrl(amt = 10, query = {}) {
+    const url = new URL(this.BASE_API_URL + '/api.php');
     const queryKeys = Object.keys(query);
     url.searchParams.set('amount', amt);
   
-    if (sessionToken) {
-      url.searchParams.set('token', sessionToken);
+    if (this.sessionToken) {
+      url.searchParams.set('token', this.sessionToken);
     }
   
     queryKeys.forEach(key => url.searchParams.set(key, query[key]));
     return url;
-  };
-
-  const buildTokenUrl = function() {
-    return new URL(BASE_API_URL + '/api_token.php');
-  };
-  
-  class Api {
-    fetchToken(callback) {
-      if (sessionToken) {
-        return sessionToken;
-      }
-    
-      const url = buildTokenUrl();
-      url.searchParams.set('command', 'request');
-    
-      $.getJSON(url, res => {
-        sessionToken = res.token;
-        callback();
-      }, err => console.log(err));
-    }
-
-    fetchQuestions(amt, query, callback) {
-      $.getJSON(buildBaseUrl(amt, query), callback, err => console.log(err.message));
-    }
-    
   }
 
-  return Api;
-}();
+  _buildTokenUrl() {
+    return new URL(this.BASE_API_URL + '/api_token.php');
+  }
+
+  fetchToken(callback) {
+    if (this.sessionToken) {
+      return this.sessionToken;
+    }
+  
+    const url = this._buildTokenUrl();
+    url.searchParams.set('command', 'request');
+  
+    $.getJSON(url, res => {
+      this.sessionToken = res.token;
+      callback();
+    }, err => console.log(err));
+  }
+
+  fetchQuestions(amt, query, callback) {
+    $.getJSON(this._buildBaseUrl(amt, query), callback, err => console.log(err.message));
+  }
+}
 
 const Store = function(){
 
@@ -112,101 +109,113 @@ const Store = function(){
   return Store;
 }();
 
-const Handler = function(store, renderer, api){
-  this.startQuiz = function() {
-    store.setInitialStore();
+class Handler {
+  constructor(store, renderer, api) {
+    this.store = store;
+    this.renderer = renderer;
+    this.api = api;
+
+    this.startQuiz = this.startQuiz.bind(this);
+    this.submitAnswer = this.submitAnswer.bind(this);
+    this.nextQuestion = this.nextQuestion.bind(this);
+  }
+
+  startQuiz() {
+    this.store.setInitialStore();
     const quantity = parseInt($('#js-question-quantity').find(':selected').val(), 10);
 
-    api.fetchQuestions(quantity, { type: 'multiple' }, res => {
+    this.api.fetchQuestions(quantity, { type: 'multiple' }, res => {
       if (res.response_code !== 0) {
         throw new Error(res);
       }
 
-      store.page = 'question';
-      store.currentQuestionIndex = 0;
-      store.seedQuestions(res.results);
-      renderer.render();
+      this.store.page = 'question';
+      this.store.currentQuestionIndex = 0;
+      this.store.seedQuestions(res.results);
+      this.renderer.render();
     });
-  };
+  }
 
-  this.submitAnswer = function(e) {
+  submitAnswer(e) {
     e.preventDefault();
-    const question = store.getCurrentQuestion();
+    const question = this.store.getCurrentQuestion();
     const selected = $('input:checked').val();
-    store.userAnswers.push(selected);
+    this.store.userAnswers.push(selected);
     
     if (selected === question.correctAnswer) {
-      store.feedback = 'You got it!';
+      this.store.feedback = 'You got it!';
     } else {
-      store.feedback = `Too bad! The correct answer was: ${question.correctAnswer}`;
+      this.store.feedback = `Too bad! The correct answer was: ${question.correctAnswer}`;
     }
   
-    store.page = 'answer';
-    renderer.render();
-  };
+    this.store.page = 'answer';
+    this.renderer.render();
+  }
 
-  this.nextQuestion = function() {
+  nextQuestion() {
     if (store.isLastQuestion()) {
       store.page = 'outro';
-      renderer.render();
+      this.renderer.render();
       return;
     }
   
     store.currentQuestionIndex++;
     store.page = 'question';
-    renderer.render();
-  };
-};
+    this.renderer.render();
+  }
+}
 
-const Renderer = function(store){
-  const hideAll = function() {
+class Renderer {
+  constructor(store) {
+    this.store = store;
+  }
+
+  _hideAll() {
     TOP_LEVEL_COMPONENTS.forEach(component => $(`.${component}`).hide());
-  };
+  }
 
-  const templates = {
-    generateAnswerItemHtml(answer) {
-      return `
-        <li class="answer-item">
-          <input type="radio" name="answers" value="${answer}" />
-          <span class="answer-text">${answer}</span>
-        </li>
-      `;
-    },
-    
-    generateQuestionHtml(question) {
-      return `
-        <form>
-          <div class="question-text">
-            ${question.text}      
-          </div>
-          <ul class="question-answers-list">
-            ${question.answers.map((answer, index) => this.generateAnswerItemHtml(answer, index)).join('')}
-          </ul>
-          <div>
-            <input type="submit" />
-          </div>
-        </form>
-      `;
-    },
+  _generateAnswerItemHtml(answer) {
+    return `
+      <li class="answer-item">
+        <input type="radio" name="answers" value="${answer}" />
+        <span class="answer-text">${answer}</span>
+      </li>
+    `;
+  }
   
-    generateFeedbackHtml(feedback) {
-      return `
-        <p>
-          ${feedback}
-        </p>
-        <button class="continue js-continue">Continue</button>
-      `;
-    }
-  };
-  
-  this.render = function() {
+  _generateQuestionHtml(question) {
+    return `
+      <form>
+        <div class="question-text">
+          ${question.text}      
+        </div>
+        <ul class="question-answers-list">
+          ${question.answers.map((answer, index) => this._generateAnswerItemHtml(answer, index)).join('')}
+        </ul>
+        <div>
+          <input type="submit" />
+        </div>
+      </form>
+    `;
+  }
+
+  _generateFeedbackHtml(feedback) {
+    return `
+      <p>
+        ${feedback}
+      </p>
+      <button class="continue js-continue">Continue</button>
+    `;
+  }
+
+  render() {
     let html;
-    hideAll();
+    this._hideAll();
   
-    const { feedback, page } = store; 
-    const question = store.getCurrentQuestion();
-    const { current, total } = store.getProgress();
-    const score = store.getScore();
+    const { feedback, page } = this.store; 
+    const question = this.store.getCurrentQuestion();
+    const { current, total } = this.store.getProgress();
+    const score = this.store.getScore();
   
     $('.js-score').html(`<span>Score: ${score}</span>`);
     $('.js-progress').html(`<span>Question ${current} of ${total}`);
@@ -217,14 +226,14 @@ const Renderer = function(store){
         break;
       
       case 'question':
-        html = templates.generateQuestionHtml(question);
+        html = this._generateQuestionHtml(question);
         $('.js-question').html(html);
         $('.js-question').show();
         $('.quiz-status').show();
         break;
   
       case 'answer':
-        html = templates.generateFeedbackHtml(feedback);
+        html = this._generateFeedbackHtml(feedback);
         $('.js-question-feedback').html(html);
         $('.js-question-feedback').show();
         $('.quiz-status').show();
@@ -238,18 +247,19 @@ const Renderer = function(store){
       default:
         return;
     } 
-  };
-};
+  }
+}
 
 // Put `store` in global scope for debugging.
 let store;
+let handler;
 
 // On DOM Ready, instantiate all services and run startup methods
 $(() => {
   const api = new Api();
   store = new Store();
   const renderer = new Renderer(store);
-  const handler = new Handler(store, renderer, api);
+  handler = new Handler(store, renderer, api);
 
   // Setup initial store and run first render
   store.setInitialStore();
