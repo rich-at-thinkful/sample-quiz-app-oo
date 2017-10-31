@@ -87,6 +87,7 @@ const Store = function(){
         delete this[prop];
       }
       this.page = 'intro';
+      this.apiReady = false;
       this.currentQuestionIndex = null;
       this.userAnswers = [];
       this.feedback = null;
@@ -109,65 +110,10 @@ const Store = function(){
   return Store;
 }();
 
-class Handler {
-  constructor(store, renderer, api) {
-    this.store = store;
-    this.renderer = renderer;
-    this.api = api;
-
-    this.startQuiz = this.startQuiz.bind(this);
-    this.submitAnswer = this.submitAnswer.bind(this);
-    this.nextQuestion = this.nextQuestion.bind(this);
-  }
-
-  startQuiz() {
-    this.store.setInitialStore();
-    const quantity = parseInt($('#js-question-quantity').find(':selected').val(), 10);
-
-    this.api.fetchQuestions(quantity, { type: 'multiple' }, res => {
-      if (res.response_code !== 0) {
-        throw new Error(res);
-      }
-
-      this.store.page = 'question';
-      this.store.currentQuestionIndex = 0;
-      this.store.seedQuestions(res.results);
-      this.renderer.render();
-    });
-  }
-
-  submitAnswer(e) {
-    e.preventDefault();
-    const question = this.store.getCurrentQuestion();
-    const selected = $('input:checked').val();
-    this.store.userAnswers.push(selected);
-    
-    if (selected === question.correctAnswer) {
-      this.store.feedback = 'You got it!';
-    } else {
-      this.store.feedback = `Too bad! The correct answer was: ${question.correctAnswer}`;
-    }
-  
-    this.store.page = 'answer';
-    this.renderer.render();
-  }
-
-  nextQuestion() {
-    if (store.isLastQuestion()) {
-      store.page = 'outro';
-      this.renderer.render();
-      return;
-    }
-  
-    store.currentQuestionIndex++;
-    store.page = 'question';
-    this.renderer.render();
-  }
-}
-
 class Renderer {
-  constructor(store) {
+  constructor(store, api) {
     this.store = store;
+    this.api = api;
   }
 
   _hideAll() {
@@ -208,20 +154,34 @@ class Renderer {
     `;
   }
 
+  _generateIntroHtml(apiReady) {
+    return `
+      Welcome to the quiz.
+      <select id="js-question-quantity">
+        <option value="3" selected>3 questions</option>
+        <option value="10">10 questions</option>
+        <option value="25">25 questions</option>
+      </select>
+      <button ${apiReady ? '' : 'disabled'} class="start js-start">Start Now</button>
+    `;    
+  }
+
   render() {
     let html;
     this._hideAll();
   
-    const { feedback, page } = this.store; 
+    const { feedback, page, apiReady } = this.store; 
     const question = this.store.getCurrentQuestion();
     const { current, total } = this.store.getProgress();
     const score = this.store.getScore();
   
     $('.js-score').html(`<span>Score: ${score}</span>`);
     $('.js-progress').html(`<span>Question ${current} of ${total}`);
-  
+
     switch (page) {
       case 'intro':
+        html = this._generateIntroHtml(apiReady);
+        $('.js-intro').html(html);
         $('.js-intro').show();
         break;
       
@@ -248,28 +208,72 @@ class Renderer {
         return;
     } 
   }
+
+  handleStartQuiz() {
+    this.store.setInitialStore();
+    const quantity = parseInt($('#js-question-quantity').find(':selected').val(), 10);
+
+    this.api.fetchQuestions(quantity, { type: 'multiple' }, res => {
+      if (res.response_code !== 0) {
+        throw new Error(res);
+      }
+
+      this.store.page = 'question';
+      this.store.currentQuestionIndex = 0;
+      this.store.seedQuestions(res.results);
+      this.render();
+    });
+  }
+
+  handleSubmitAnswer(e) {
+    e.preventDefault();
+    const question = this.store.getCurrentQuestion();
+    const selected = $('input:checked').val();
+    this.store.userAnswers.push(selected);
+    
+    if (selected === question.correctAnswer) {
+      this.store.feedback = 'You got it!';
+    } else {
+      this.store.feedback = `Too bad! The correct answer was: ${question.correctAnswer}`;
+    }
+  
+    this.store.page = 'answer';
+    this.render();
+  }
+
+  handleNextQuestion() {
+    if (this.store.isLastQuestion()) {
+      this.store.page = 'outro';
+      this.render();
+      return;
+    }
+  
+    this.store.currentQuestionIndex++;
+    this.store.page = 'question';
+    this.render();
+  }
+
+  applyEventListeners() {
+    $('.js-intro, .js-outro').on('click', '.js-start', () => this.handleStartQuiz());
+    $('.js-question').on('submit', e => this.handleSubmitAnswer(e));
+    $('.js-question-feedback').on('click', '.js-continue', () => this.handleNextQuestion());
+  }
 }
 
-// Put `store` in global scope for debugging.
-let store;
-let handler;
+const api = new Api();
+const store = new Store();
+const renderer = new Renderer(store, api);
 
 // On DOM Ready, instantiate all services and run startup methods
 $(() => {
-  const api = new Api();
-  store = new Store();
-  const renderer = new Renderer(store);
-  handler = new Handler(store, renderer, api);
-
   // Setup initial store and run first render
   store.setInitialStore();
   renderer.render();
-
+  renderer.applyEventListeners();
+  
   api.fetchToken(() => {
-    $('.js-start').attr('disabled', false);
+    store.apiReady = true;
+    renderer.render();
   });
 
-  $('.js-intro, .js-outro').on('click', '.js-start', handler.startQuiz);
-  $('.js-question').on('submit', handler.submitAnswer);
-  $('.js-question-feedback').on('click', '.js-continue', handler.nextQuestion);
 });
