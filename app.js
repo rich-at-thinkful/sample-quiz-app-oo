@@ -1,11 +1,5 @@
-const TOP_LEVEL_COMPONENTS = [
-  'js-intro', 'js-question', 'js-question-feedback', 
-  'js-outro', 'js-quiz-status',
-];
-
 class Api {
   constructor(){
-    this.BASE_API_URL = 'https://opentdb.com'; 
     this.sessionToken = null;
   }
 
@@ -44,6 +38,10 @@ class Api {
     $.getJSON(this._buildBaseUrl(amt, query), callback, err => console.log(err.message));
   }
 }
+
+// Constant properties placed on the Api prototype (class), as they only need to be stored once, 
+// but available to all class instances.
+Api.prototype.BASE_API_URL = 'https://opentdb.com';
 
 class Store {
   constructor() {
@@ -115,7 +113,7 @@ class Renderer {
   }
 
   _hideAll() {
-    TOP_LEVEL_COMPONENTS.forEach(component => $(`.${component}`).hide());
+    this.TOP_LEVEL_COMPONENTS.forEach(component => $(`.${component}`).hide());
   }
 
   _generateAnswerItemHtml(answer) {
@@ -257,6 +255,14 @@ class Renderer {
     $('.js-question-feedback').on('click', '.js-continue', () => this.handleNextQuestion());
   }
 }
+
+// Constant properties placed on the Renderer prototype (class), as they only need to be stored once, 
+// but available to all class instances.
+Renderer.prototype.TOP_LEVEL_COMPONENTS = [
+  'js-intro', 'js-question', 'js-question-feedback', 
+  'js-outro', 'js-quiz-status',
+];
+
 
 const api = new Api();
 const store = new Store();
