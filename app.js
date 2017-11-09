@@ -24,7 +24,7 @@ class Api {
 
   fetchToken(callback) {
     if (this.sessionToken) {
-      return this.sessionToken;
+      return callback();
     }
   
     const url = this._buildTokenUrl();
