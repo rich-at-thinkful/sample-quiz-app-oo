@@ -1,3 +1,5 @@
+'use strict';
+
 class Api {
   constructor(){
     this.sessionToken = null;
@@ -118,25 +120,21 @@ class Renderer {
 
   _generateAnswerItemHtml(answer) {
     return `
-      <li class="answer-item">
-        <input type="radio" name="answers" value="${answer}" />
-        <span class="answer-text">${answer}</span>
-      </li>
+      <div class="answer-item">
+        <input type="radio" name="answer" value="${answer}" id="${answer}" />
+        <label for="${answer}" class="answer-text">${answer}</label>
+      </div>
     `;
   }
   
   _generateQuestionHtml(question) {
     return `
       <form>
-        <div class="question-text">
-          ${question.text}      
-        </div>
-        <ul class="question-answers-list">
-          ${question.answers.map((answer, index) => this._generateAnswerItemHtml(answer, index)).join('')}
-        </ul>
-        <div>
-          <input type="submit" />
-        </div>
+        <fieldset>
+          <legend class="question-text">${question.text}</legend>
+            ${question.answers.map((answer, index) => this._generateAnswerItemHtml(answer, index)).join('')}
+          <button type="submit">Submit</button>
+        </fieldset>
       </form>
     `;
   }
