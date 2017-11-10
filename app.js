@@ -39,6 +39,10 @@ class Api {
   fetchQuestions(amt, query, callback) {
     $.getJSON(this._buildBaseUrl(amt, query), callback, err => console.log(err.message));
   }
+  
+  hasToken() {
+    return this.sessionToken !== null;
+  }
 }
 
 // Constant properties placed on the Api prototype (class), as they only need to be stored once, 
@@ -63,13 +67,13 @@ class Store {
   }
 
   // Public methods
-  setOrResetInitialStore() {
+  setOrResetInitialStore(apiReady = false) {
     for (const prop of Object.getOwnPropertyNames(this)) {
       delete this[prop];
     }
     this._QUESTIONS = [];
     this.page = 'intro';
-    this.apiReady = false;
+    this.apiReady = apiReady;
     this.currentQuestionIndex = null;
     this.userAnswers = [];
     this.feedback = null;
@@ -204,7 +208,8 @@ class Renderer {
   }
 
   handleStartQuiz() {
-    this.store.setOrResetInitialStore();
+    const apiReady = this.api.hasToken();
+    this.store.setOrResetInitialStore(apiReady);
     const quantity = parseInt($('#js-question-quantity').find(':selected').val(), 10);
 
     this.api.fetchQuestions(quantity, { type: 'multiple' }, res => {
